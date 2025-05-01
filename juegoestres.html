@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Juego Educativo para Niños</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Comic Sans MS', cursive;
+      background-color: #f0f8ff;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      color: #2c3e50;
+    }
+    .question {
+      font-size: 24px;
+      margin: 20px;
+    }
+    .options {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+      margin: 20px 0;
+    }
+    .option-btn {
+      font-size: 30px;
+      padding: 20px;
+      border: 2px solid #ccc;
+      border-radius: 15px;
+      cursor: pointer;
+      background-color: #fff;
+    }
+    .option-btn:hover {
+      background-color: #dff9fb;
+    }
+    #timer, #feedback {
+      font-size: 20px;
+      margin: 10px;
+    }
+    .distractor {
+      display: none;
+      font-size: 40px;
+      color: red;
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      animation: flash 0.5s infinite alternate;
+    }
+    @keyframes flash {
+      0% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    #chartContainer {
+      width: 80%;
+      margin: auto;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎉 Juego Educativo</h1>
+  <div class="question" id="question">Haz clic en "Iniciar"</div>
+  <div class="options" id="options"></div>
+  <div id="timer"></div>
+  <div id="feedback"></div>
+  <div class="distractor" id="distractor">¡RÁPIDO!</div>
+
+  <button onclick="startGame()">Iniciar Escenario 1</button>
+  <button onclick="startStressGame()">Escenario 2 (Con estrés)</button>
+  <button onclick="downloadCSV()">📥 Descargar resultados</button>
+
+  <div id="chartContainer">
+    <h2>📊 Resultados</h2>
+    <canvas id="resultChart"></canvas>
+  </div>
+
+  <script>
+    const categories = [
+      { tipo: "color", pregunta: "Haz clic en el color ROJO", correcta: "🔴", opciones: ["🔵", "🟡", "🟢", "🔴"] },
+      { tipo: "animal", pregunta: "¿Dónde está el 🐶 perro?", correcta: "🐶", opciones: ["🐱", "🐸", "🐶", "🐷"] },
+      { tipo: "forma", pregunta: "Haz clic en el 🔺 triángulo", correcta: "🔺", opciones: ["🔵", "⬛", "🔺", "⬜"] },
+      { tipo: "letra", pregunta: "Haz clic en la letra A", correcta: "A", opciones: ["B", "C", "A", "D"] },
+      { tipo: "animal", pregunta: "¿Dónde está el 🐘 elefante?", correcta: "🐘", opciones: ["🐴", "🐘", "🐒", "🦓"] },
+      { tipo: "color", pregunta: "Haz clic en el color AMARILLO", correcta: "🟡", opciones: ["🟢", "🟣", "🟡", "🔴"] },
+      { tipo: "número", pregunta: "Haz clic en el número 3", correcta: "3", opciones: ["1", "3", "5", "2"] },
+      { tipo: "número", pregunta: "Haz clic en el número 7", correcta: "7", opciones: ["8", "6", "7", "5"] },
+      { tipo: "fruta", pregunta: "¿Dónde está la 🍎 manzana?", correcta: "🍎", opciones: ["🍌", "🍓", "🍎", "🍉"] },
+      { tipo: "fruta", pregunta: "¿Dónde está la 🍇 uva?", correcta: "🍇", opciones: ["🍒", "🍍", "🍇", "🍊"] }
+    ];
+
+    let currentIndex = 0;
+    let underStress = false;
+    let startTime = 0;
+    let countdownId;
+    let results = [];
+
+    function startGame() {
+      underStress = false;
+      currentIndex = 0;
+      results = [];
+      document.getElementById("distractor").style.display = "none";
+      document.getElementById("chartContainer").style.display = "none";
+      nextQuestion();
+    }
+
+    function startStressGame() {
+      underStress = true;
+      currentIndex = 0;
+      results = [];
+      document.getElementById("distractor").style.display = "block";
+      document.getElementById("chartContainer").style.display = "none";
+      nextQuestion();
+    }
+
+    function nextQuestion() {
+      if (currentIndex >= categories.length) {
+        endGame();
+        return;
+      }
+
+      const q = categories[currentIndex];
+      document.getElementById("question").textContent = q.pregunta;
+      document.getElementById("feedback").textContent = "";
+      const optionsDiv = document.getElementById("options");
+      optionsDiv.innerHTML = "";
+
+      q.opciones.forEach(opcion => {
+        const btn = document.createElement("button");
+        btn.className = "option-btn";
+        btn.textContent = opcion;
+        btn.onclick = () => checkAnswer(opcion);
+        optionsDiv.appendChild(btn);
+      });
+
+      if (underStress) startCountdown(6);
+      startTime = Date.now();
+    }
+
+    function checkAnswer(respuesta) {
+      if (underStress) clearInterval(countdownId);
+
+      const q = categories[currentIndex];
+      const tiempo = ((Date.now() - startTime) / 1000).toFixed(2);
+      const correcto = respuesta === q.correcta;
+      results.push({
+        escenario: underStress ? 2 : 1,
+        tipo: q.tipo,
+        pregunta: q.pregunta,
+        respuesta: respuesta,
+        correcta: q.correcta,
+        resultado: correcto ? "Correcto" : "Incorrecto",
+        tiempo: tiempo
+      });
+
+      document.getElementById("feedback").textContent = correcto ? "✅ ¡Muy bien!" : "❌ Incorrecto";
+      currentIndex++;
+      setTimeout(nextQuestion, 1000);
+    }
+
+    function startCountdown(segundos) {
+      let tiempo = segundos;
+      const timer = document.getElementById("timer");
+      timer.textContent = `⏱ ${tiempo}s`;
+      countdownId = setInterval(() => {
+        tiempo--;
+        timer.textContent = `⏱ ${tiempo}s`;
+        if (tiempo <= 0) {
+          clearInterval(countdownId);
+          recordTimeout();
+        }
+      }, 1000);
+    }
+
+    function recordTimeout() {
+      const q = categories[currentIndex];
+      results.push({
+        escenario: 2,
+        tipo: q.tipo,
+        pregunta: q.pregunta,
+        respuesta: "Sin respuesta",
+        correcta: q.correcta,
+        resultado: "Tiempo agotado",
+        tiempo: "6.00"
+      });
+      document.getElementById("feedback").textContent = "⏰ Tiempo agotado";
+      currentIndex++;
+      setTimeout(nextQuestion, 1000);
+    }
+
+    function endGame() {
+      document.getElementById("question").textContent = "🎉 ¡Has terminado el juego!";
+      document.getElementById("options").innerHTML = "";
+      document.getElementById("timer").textContent = "";
+      document.getElementById("distractor").style.display = "none";
+      showChart();
+    }
+
+    function downloadCSV() {
+      let csv = "Escenario,Categoría,Pregunta,Respuesta,Correcta,Resultado,Tiempo\n";
+      results.forEach(r => {
+        csv += `${r.escenario},${r.tipo},"${r.pregunta}",${r.respuesta},${r.correcta},${r.resultado},${r.tiempo}\n`;
+      });
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "resultados_juego.csv";
+      link.click();
+    }
+
+    function showChart() {
+      const chartData = {};
+      results.forEach(r => {
+        if (!chartData[r.tipo]) chartData[r.tipo] = { correcto: 0, incorrecto: 0 };
+        if (r.resultado === "Correcto") chartData[r.tipo].correcto++;
+        else chartData[r.tipo].incorrecto++;
+      });
+
+      const labels = Object.keys(chartData);
+      const correctos = labels.map(cat => chartData[cat].correcto);
+      const incorrectos = labels.map(cat => chartData[cat].incorrecto);
+
+      document.getElementById("chartContainer").style.display = "block";
+      const ctx = document.getElementById("resultChart").getContext("2d");
+      new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "Correctos",
+              data: correctos,
+              backgroundColor: "#2ecc71"
+            },
+            {
+              label: "Incorrectos",
+              data: incorrectos,
+              backgroundColor: "#e74c3c"
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              stepSize: 1
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
